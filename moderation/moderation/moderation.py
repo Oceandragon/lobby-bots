@@ -354,7 +354,6 @@ class Moderation(slixmpp.ClientXMPP):
             mute = Mute(player=slixmpp.jid.JID(jid).bare, moderator=kwargs['moderator'],
                         start=datetime.now(), end=end,incident_id=incident_id)
             db.add(mute)
-            db.commit()
                 
             if type(end) is datetime: self.scheduler.schedule(self._scheduled_mute_ends(mute.player, mute.id), mute.end)
 
