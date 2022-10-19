@@ -9,6 +9,7 @@ WEB_INTERFACE_REQUIREMENTS = [
     'email_validator',
     'Flask',
     'Flask-security',
+    'bcrypt==3.1.7',
 ]
 TEST_REQUIREMENTS = [
     'coverage',
