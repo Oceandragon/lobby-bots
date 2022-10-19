@@ -119,7 +119,7 @@ class BotCommandProcessor(CommandProcessor):
         super().__init__()
 
     async def command_help(self, moderator, **kargs):
-        logging.debug("command_help", pformat(kargs))
+        logging.debug("command_help: %s", pformat(kargs))
         response=[]
         if kargs['helpcmd']:
             if kargs['helpcmd'] in self.subparsers: response.append(self.subparsers[kargs['helpcmd']].format_help())
@@ -131,17 +131,17 @@ class BotCommandProcessor(CommandProcessor):
         return "\n".join(response)
 
     async def command_ban(self, moderator, jid, **kargs):
-        logging.debug("command_ban", pformat(kargs))
+        logging.debug("command_ban: %s", pformat(kargs))
         response=[]
         return "\n".join(response)
 
     async def command_unban(self, moderator, **kargs):
-        logging.debug("command_unban", pformat(kargs))
+        logging.debug("command_unban: %s", pformat(kargs))
         response=[]
         return "\n".join(response)
 
     async def command_mutelist(self, moderator, **kargs):
-        logging.debug("command_mutelist", pformat(kargs))
+        logging.debug("command_mutelist: %s", pformat(kargs))
         results = []
         to = slixmpp.jid.JID(self.xmpp.sjid.bare)
         to.resource = "moderation"
@@ -157,7 +157,7 @@ class BotCommandProcessor(CommandProcessor):
         else: return "Users currently muted: %s" % ", ".join(muted)
 
     async def command_mute(self, moderator, reason="", **kargs):
-        logging.debug("command_mute", pformat(kargs))
+        logging.debug("command_mute: %s", pformat(kargs))
         results = []
         to = slixmpp.jid.JID(self.xmpp.sjid.bare)
         to.resource = "moderation"
@@ -178,7 +178,7 @@ class BotCommandProcessor(CommandProcessor):
         return "\n".join(results)
         
     async def command_unmute(self, moderator, reason="", **kargs):
-        logging.debug("command_unmute", pformat(kargs))
+        logging.debug("command_unmute: %s", pformat(kargs))
         results = []
         to = slixmpp.jid.JID(self.xmpp.sjid.bare)
         to.resource = "moderation"
