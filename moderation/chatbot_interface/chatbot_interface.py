@@ -46,7 +46,6 @@ from traceback import format_exc
 class CommandProcessor():
     """ Configure a parser to handle commands.
     """
-
     def __init__(self):
         """ Chatbot commands are added as subparsers.
         The available commands (help, ban, unban, mutelist, mute, unmute) are defined here.
@@ -58,46 +57,47 @@ class CommandProcessor():
         self.subparsers = {}
        
         # Help
-        self.subparsers['help'] = subparser.add_parser('help', description='Get help', add_help=True)
+        self.subparsers['help'] = subparser.add_parser('help', description='Get help', add_help=False)
         self.subparsers['help'].add_argument('helpcmd', action='store', help='Get help on a specific command', nargs='?', metavar='help-command', )
 
         # Ban
-        self.subparsers['ban'] = subparser.add_parser('ban', description='Add a player to the ban list', add_help=True)
+        self.subparsers['ban'] = subparser.add_parser('ban', description='Add a player to the ban list (not implemented yet)', add_help=False)
         self.subparsers['ban'].add_argument('jid', action='store', help='Specify jid', )
 
         # Unban
-        self.subparsers['unban'] = subparser.add_parser('unban', description='Unban a previously banned player', add_help=True)
+        self.subparsers['unban'] = subparser.add_parser('unban', description='Unban a previously banned player (not implemented yet)', add_help=False)
         self.subparsers['unban'].add_argument('jid', action='store', help='Specify jid', )
 
         # Mutelist
-        self.subparsers['mutelist'] = subparser.add_parser('mutelist', description='Get mute list', add_help=True)
+        self.subparsers['mutelist'] = subparser.add_parser('mutelist', description='Get mute list', add_help=False)
 
         # Mute
-        self.subparsers['mute'] = subparser.add_parser('mute', description='Add a player to the mute list', add_help=True)
+        self.subparsers['mute'] = subparser.add_parser('mute', description='Add a player to the mute list', add_help=False, formatter_class=CondensingFormatter)
         match_by = self.subparsers['mute'].add_mutually_exclusive_group()
         match_by.add_argument('--nick', dest="match_by", action='store_const', const='nick', help='Match by nick', )
-        match_by.add_argument('--regex', dest="match_by", action='store_const', const='regex', help='Match by regex', )
+        match_by.add_argument('--regex', dest="match_by", action='store_const', const='regex', help='Match by regex (not implemented yet)', )
         match_by.add_argument('-j', '--jid', dest="match_by", action='store_const', const='jid', help='Match by JID', )
         match_by.set_defaults(match_by='nick')
         self.subparsers['mute'].add_argument('user', action='store', help='User to mute', )
         self.subparsers['mute'].add_argument('duration', action=join_with_spaces, help='For a timed mute, specify duration', default='15 minutes'.split(" "), nargs='*', )
-        self.subparsers['mute'].add_argument('-r', '--reason', action=join_with_spaces, help='Add a reason (Not currently required)', nargs='+', )
+        self.subparsers['mute'].add_argument('-r', '--reason', action=join_with_spaces, help='Add a reason', nargs='+', )
 
         # Unmute
-        self.subparsers['unmute'] = subparser.add_parser('unmute', description='Remove a player from the mute list', add_help=True)
+        self.subparsers['unmute'] = subparser.add_parser('unmute', description='Remove a player from the mute list', add_help=False)
         match_by = self.subparsers['unmute'].add_mutually_exclusive_group()
         match_by.add_argument('--nick', dest="match_by", action='store_const', const='nick', help='Match by nick', )
-        match_by.add_argument('--regex', dest="match_by", action='store_const', const='regex', help='Match by regex', )
+        match_by.add_argument('--regex', dest="match_by", action='store_const', const='regex', help='Match by regex (not implemented yet)', )
         match_by.add_argument('-j', '--jid', dest="match_by", action='store_const', const='jid', help='Match by JID', )
         match_by.set_defaults(match_by='nick')
         self.subparsers['unmute'].add_argument('user', action='store', help='User to unmute', )
-        self.subparsers['unmute'].add_argument('-r', '--reason', action=join_with_spaces, help='Add a reason (Not currently required)', nargs='+',)
+        self.subparsers['unmute'].add_argument('-r', '--reason', action=join_with_spaces, help='Add a reason', nargs='+',)
 
     async def process_commands(self, moderator, text):
         def get_response():
             return "\n".join(self.parser.response)
         try: parsed = self.parser.parse_args(text)
         except (argparse.ArgumentError) as e: 
+            print(e.message)
             print("yup", get_response())
             return get_response()
         parsed = vars(parsed)
@@ -107,7 +107,7 @@ class CommandProcessor():
             try:
                 task=asyncio.create_task(command_method(moderator, **parsed))
                 await task
-                if task.exception(): print("asdfasdfasdfasdfasdfdasf")
+                if task.exception(): logging.exception(format_exc)
                 return task.result()
             except: logging.exception(format_exc())
         return get_response()
@@ -260,8 +260,20 @@ class ChatbotInterface(slixmpp.ClientXMPP):
         return False
         
 
+class CondensingFormatter(argparse.HelpFormatter):
+    """ Change formatting of usage message for nargs=* and nargs=+ arguments
+    """
+    def _format_args(self, action, default_metavar):
+        get_metavar = self._metavar_formatter(action, default_metavar)
+        if action.nargs in [argparse.ONE_OR_MORE, argparse.ZERO_OR_MORE]:
+            return '%s' % get_metavar(1)
+        else:
+            return super(CondensingFormatter, self)._format_args(action, default_metavar)
+
 class ChatbotArgumentParser(argparse.ArgumentParser):
-    """Override ArgumentParser methods
+    """Override ArgumentParser methods to cause output to go to an accumlated 
+        response which will be retrieved later. Also prevent exit from invoking sys.exit() 
+        and terminating the process.
     """
 
     def __init__(self, *args, **kwargs):
@@ -277,6 +289,7 @@ class ChatbotArgumentParser(argparse.ArgumentParser):
 
     def error(self, message):
         self.print_help()
+        logging.exception(format_exc())
         args = {'prog': self.prog, 'message': message}
         self.exit(2, gettext('%(prog)s: error: %(message)s\n') % args)
 
