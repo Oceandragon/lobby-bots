@@ -327,6 +327,7 @@ class Moderation(slixmpp.ClientXMPP):
         with db_session() as db, db.begin():
             # Make sure the moderator exists.
             if not db.get(Moderator, kwargs['moderator']):
+                logging.info("%s is not a moderator.", kwargs['moderator'])
                 return False
 
             # Find JID by nickname
@@ -377,6 +378,7 @@ class Moderation(slixmpp.ClientXMPP):
         with db_session() as db, db.begin():
             # Make sure the moderator exists.
             if not db.get(Moderator, kwargs['moderator']):
+                logging.info("%s is not a moderator.", kwargs['moderator'])
                 return False
 
             # Find JID by nickname
@@ -416,7 +418,8 @@ class Moderation(slixmpp.ClientXMPP):
         with db_session() as db, db.begin():
             # Make sure the moderator exists.
             if not db.get(Moderator, kwargs['moderator']):
-                return False
+                logging.info("%s is not a moderator.", kwargs['moderator'])
+                return []
 
             for mute in db.execute(select(Mute).filter_by(active=True, deleted=None).group_by(Mute.player)).scalars().all():
                 result.append(row2dict(mute))
@@ -434,27 +437,27 @@ class Moderation(slixmpp.ClientXMPP):
                 reason (str):       (Optional) Specify a reason to display publicly
         """
         logging.info("Command: kick")
-        with db_session() as db:
-            with db.begin():
-                # Make sure the moderator exists.
-                if not db.get(Moderator, kwargs['moderator']):
-                    return False
+        with db_session() as db, db.begin():
+            # Make sure the moderator exists.
+            if not db.get(Moderator, kwargs['moderator']):
+                logging.info("%s is not a moderator.", kwargs['moderator'])
+                return False
 
-                # Find JID by nickname
-                if not jid:
-                    for room in self.rooms:
-                        for nickname,njid in self._get_roster_jids(room).items():
-                            if nickname==nick:
-                                jid=njid
-                                break
+            # Find JID by nickname
+            if not jid:
+                for room in self.rooms:
+                    for nickname,njid in self._get_roster_jids(room).items():
+                        if nickname==nick:
+                            jid=njid
+                            break
 
-                if not jid:
-                    logging.warn("Unable to kick user. Couldn't resolve a JID")
-                    return False
-                
-                logging.info("Kicking user with JID: %s", jid)
-                asyncio.ensure_future(self._muc_kick(nick or slixmpp.jid.JID(jid).user, reason=reason))
-                return True
+            if not jid:
+                logging.warn("Unable to kick user. Couldn't resolve a JID")
+                return False
+            
+            logging.info("Kicking user with JID: %s", jid)
+            asyncio.ensure_future(self._muc_kick(nick or slixmpp.jid.JID(jid).user, reason=reason))
+            return True
 
 
     async def _scheduled_mute_ends(self, user, db_mute_id = None):
