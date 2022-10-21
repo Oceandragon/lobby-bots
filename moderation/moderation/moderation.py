@@ -143,7 +143,7 @@ class Moderation(slixmpp.ClientXMPP):
         if jid.bare in self.muted:
             asyncio.ensure_future(self._muc_mute(nick, room=presence['muc']['room']))            
         
-        logging.info("Client '%s' connected with a nick of '%s'.", jid, nick)
+        logging.debug("Client '%s' connected with a nick of '%s'.", jid, nick)
 
     def _got_muc_offline(self, presence):
         """Called when all resources of a user have disconnected from a muc
@@ -425,7 +425,7 @@ class Moderation(slixmpp.ClientXMPP):
                 result.append(row2dict(mute))
             return result
 
-    def command_kick(self, jid=None, nick=None, incident_id=None, reason=None):
+    def command_kick(self, jid=None, nick=None, incident_id=None, reason=None, **kwargs):
         """ Kick a player.
             Specify either JID or nick.
 
