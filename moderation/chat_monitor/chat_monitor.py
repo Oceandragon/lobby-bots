@@ -162,8 +162,10 @@ class ChatMonitor(slixmpp.ClientXMPP):
                     iq.enable('moderation')
                     iq['moderation']['moderation_command']['command_name'] = "mute"
                     iq['moderation']['moderation_command']['params'] = {"jid": jid.bare,
-                                                                        "duration": str(duration), "reason": "Profanity"}
-                    try: iq.send()
+                                                                        "duration": str(duration), "reason": "Profanity",
+                                                                        "moderator": "userbot@lobby.wildfiregames.com"}
+                    try:
+                        iq.send()
                     except: logging.exception(traceback.format_exc())
                     
                 else: 
@@ -175,7 +177,7 @@ class ChatMonitor(slixmpp.ClientXMPP):
                     iq.enable('moderation')
                     iq['moderation']['moderation_command']['command_name'] = "kick"
                     iq['moderation']['moderation_command']['params'] = {"jid": jid.bare, "reason": "Don't use profanity in the main lobby.",
-                                                                        moderator: "userbot@lobby.wildfiregames.com"}
+                                                                        "moderator": "userbot@lobby.wildfiregames.com"}
                     try:
                         iq.send()
                     except: logging.exception(format_exc())
