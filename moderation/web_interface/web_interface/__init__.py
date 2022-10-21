@@ -20,9 +20,9 @@ from datetime import datetime, timedelta
 from flask import Flask, request, redirect, url_for, render_template
 from flask_security import Security, login_required, \
      SQLAlchemySessionUserDatastore
+from moderation.data.database import db_session, create_tables, row2dict
 from moderation.data.models import Mute, Moderator
 from chat_monitor.models import ProfanityIncident
-from moderation.data.database import db_session, create_tables
 from pprint import pprint
 from sqlalchemy.sql import select, operators
 from web_interface.web_interface.web_user_model import WebUser, WebRole
@@ -52,9 +52,14 @@ def create_app():
     @app.route("/")
     @login_required
     def index():
-        content = {}
         with db_session() as db:
-            content=db.execute(select(Mute).where(operators.isnot(Mute.deleted, True), Mute.start >= datetime.now() - timedelta(days=1) ).order_by(Mute.start.desc())).scalars().all()
+            content=db.execute(select(Mute).where(operators.isnot(Mute.deleted, True), Mute.start >= datetime.now() - timedelta(days=2) ).order_by(Mute.start.desc())).scalars().all()
+            content = [row2dict(row) for row in content]
+            for item in content:
+                print((datetime.now() - item['start']).seconds)
+                if item['end'] and item['start']:
+                    item['rounded_duration'] = round_duration((item['end'] - item['start']).seconds)
+                    item['rounded_start'] = round_duration((datetime.now() - item['start']).seconds)
         return render_template("index.html", content=content)
 
     @app.route("/mutes")
@@ -64,3 +69,37 @@ def create_app():
 #        db_session().execute(select(Mute).filter_by(active=True, deleted is not None).all
 
     return app
+
+
+def round_duration(duration):
+    '''Get a shortened, human-readable, rounded approximation of the
+        duration.
+        
+        Arguments:
+            duration : Duration to convert specified in seconds.
+
+        Returns: String
+        
+    '''
+    def round_nearest_half(number):
+        return round(number * 2) /2
+
+    return_=[]
+    seconds = duration
+    minutes = int(0)
+    hours = 0
+    days = 0
+    weeks = 0
+    if seconds > 60:
+        minutes = int(seconds / 60)
+        if minutes > 60:
+            hours = int(minutes / 60)
+            if hours > 24:
+                days = int(hours / 24)
+                if days > 7:
+                    return f"about {round_nearest_half(days/7):g} weeks"
+                return f"about {round_nearest_half(hours/24):g} days"
+            return f"about {round_nearest_half(minutes/60):g} hours"
+        return f"about {round_nearest_half(seconds/60):g} minutes"
+    return f"about {seconds} seconds"
+

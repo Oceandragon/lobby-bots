@@ -37,7 +37,7 @@
 }
 .sidebar .sidebar_container {
      overflow: scroll;
-     max-height: 200px;
+     max-height: 600px;
      }
 .sidebar {
      background-color:lightblue;
