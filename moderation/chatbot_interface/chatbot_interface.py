@@ -48,7 +48,7 @@ class CommandProcessor():
     """
     def __init__(self):
         """ Chatbot commands are added as subparsers.
-        The available commands (help, ban, unban, mutelist, mute, unmute) are defined here.
+        The available commands (help, mutelist, mute, unmute) are defined here.
         """
 
         self.parser = ChatbotArgumentParser(prog="", description='Moderation Bot', add_help=False)
@@ -60,13 +60,13 @@ class CommandProcessor():
         self.subparsers['help'] = subparser.add_parser('help', description='Get help', add_help=False)
         self.subparsers['help'].add_argument('helpcmd', action='store', help='Get help on a specific command', nargs='?', metavar='help-command', )
 
-        # Ban
-        self.subparsers['ban'] = subparser.add_parser('ban', description='Add a player to the ban list (not implemented yet)', add_help=False)
-        self.subparsers['ban'].add_argument('jid', action='store', help='Specify jid', )
+        # Ban (TODO)
+        #self.subparsers['ban'] = subparser.add_parser('ban', description='Add a player to the ban list (not implemented yet)', add_help=False)
+        #self.subparsers['ban'].add_argument('jid', action='store', help='Specify jid', )
 
-        # Unban
-        self.subparsers['unban'] = subparser.add_parser('unban', description='Unban a previously banned player (not implemented yet)', add_help=False)
-        self.subparsers['unban'].add_argument('jid', action='store', help='Specify jid', )
+        # Unban (TODO)
+        #self.subparsers['unban'] = subparser.add_parser('unban', description='Unban a previously banned player (not implemented yet)', add_help=False)
+        #self.subparsers['unban'].add_argument('jid', action='store', help='Specify jid', )
 
         # Mutelist
         self.subparsers['mutelist'] = subparser.add_parser('mutelist', description='Get mute list', add_help=False)
