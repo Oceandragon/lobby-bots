@@ -172,7 +172,7 @@ class Moderation(slixmpp.ClientXMPP):
     async def _muc_mute(self, nick, room=None, reason=''):
         """Perform mute on a nick in a MUC room or all rooms
         """
-
+        nick = self._get_nick_case(nick, room=room)
         logging.info("Muting MUC nick: %s", nick)
         rooms = [ room ] if room else self.rooms
         for room in rooms:
@@ -182,7 +182,7 @@ class Moderation(slixmpp.ClientXMPP):
     async def _muc_unmute(self, nick, room=None, reason=''):
         """Unmute nick in a MUC room or all MUC rooms
         """
-
+        nick = self._get_nick_case(nick, room=room)
         logging.info("Unmuting MUC nick: %s", nick)
         rooms = [ room ] if room else self.rooms
         for room in rooms:
@@ -193,14 +193,20 @@ class Moderation(slixmpp.ClientXMPP):
         """Perform kick on a nick in a MUC room or all rooms
 
             Arguments:
+                nick (str) :     Nickname of user to kick.
                 room (str) :     (Optional) Specify MUC room.
                 reason (str) :   (Optional) Specify reason to display publicly.
         """ 
+        print(nick)
+        #if room: nick = self._get_nick_case(nick, room=room)
+        #else: nick = self._get_nick_case(nick)
+        nick = self._get_nick_case(nick, room=room)
         logging.info("Kicking MUC nick: %s", nick)
         rooms = [ room ] if room else self.rooms
         for room in rooms:
             try: await self.plugin['xep_0045'].set_role(room, nick, 'none', reason=reason)
-            except: ... # Nick is not in the MUC room
+            except:
+                logging.debug("Nick is not in the MUC room")
 
     async def _muc_ban(self, jid, room=None, reason=''):
         """Perform ban on a JID in a MUC room or all rooms
@@ -230,12 +236,14 @@ class Moderation(slixmpp.ClientXMPP):
         logging.debug(iq)
         
         if iq["type"]=="set":
+            logging.info(iq)
             command = iq['moderation']['moderation_command']['command_name']
             params = iq['moderation']['moderation_command']['params']
             if 'moderator' in params:
                 moderator = params['moderator']
             else:
                 moderator = "userbot@lobby.wildfiregames.com"
+
 
             params['moderator'] = moderator
             reply=iq.reply(clear=False)
@@ -284,18 +292,21 @@ class Moderation(slixmpp.ClientXMPP):
                 return False
 
     def _get_jid(self, nick, room=None):
-        """Return JID for the nick in a MUC room or all rooms.
+        """Return JID for a nick. This is case insensitive.
             
         Arguments:
-            room (slixmpp.jid.JID): (optional) MUC room
-            
+            nick (slixmpp.jid.JID): Retrieve JID for this nick            
         """ 
+        
         rooms = [ room ] if room else self.rooms
         for room in rooms:
-            roster=self.plugin['xep_0045'].get_roster(room)
-            if nick in roster: return self.plugin['xep_0045'].get_jid_property(room, nick, "jid")
+            roster = self.plugin['xep_0045'].get_roster(room)
+            map_lower_nicks = { nick.lower(): nick for nick in roster }
+            roster_lowercase = [nick.lower() for nick in roster]
+
+            if nick.lower() in roster_lowercase: return slixmpp.jid.JID(self.plugin['xep_0045'].get_jid_property(room, map_lower_nicks[nick.lower()], "jid"))
         return False
-        
+                
     def _get_roster_jids(self, room):
         """Return roster for the MUC room as a dict of jids keyed by
         nickname
@@ -309,7 +320,23 @@ class Moderation(slixmpp.ClientXMPP):
         for nick in roster:
             result[nick]=slixmpp.jid.JID(self.plugin['xep_0045'].get_jid_property(room, nick, "jid"))
         return result
-        
+    def _get_nick_case(self, nick, room=None):
+        """Return the proper case for a nickname specified in any case.
+            
+            Arguments:
+                nick (str): Case-insensitive nickname to lookup
+                room (slixmpp.jid.JID): (Optional) Specify MUC room
+                
+            Returns (str): Proper case for nickname or False if it fails
+        """
+        nick = nick.lower()
+        rooms = [ room ] if room else self.rooms
+        for room in rooms:
+            roster = self.plugin['xep_0045'].get_roster(room)
+            map_lower_nicks = { nick.lower(): nick for nick in roster }
+            try: return map_lower_nicks[nick]
+            except KeyError: ... # Nick not found in room
+        return False
     def command_mute(self, jid=None, nick=None, duration=None, incident_id=None, reason='', end=None, **kwargs):
         """Add a mute to the database and mute the user in the MUC rooms.
         Specify either jid or nick.
@@ -324,19 +351,20 @@ class Moderation(slixmpp.ClientXMPP):
         """        
         logging.info("Command: mute")
 
-        with db_session() as db, db.begin():
+        with db_session() as db:
             # Make sure the moderator exists.
             if not db.get(Moderator, kwargs['moderator']):
                 logging.info("%s is not a moderator.", kwargs['moderator'])
                 return False
 
+            if not jid: jid = self._get_jid(nick)
             # Find JID by nickname
-            if not jid:
-                for room in self.rooms:
-                    for nickname,njid in self._get_roster_jids(room).items():
-                        if nickname==nick:
-                            jid=njid
-                            break
+            #if not jid:
+            #    for room in self.rooms:
+            #        for nickname,njid in self._get_roster_jids(room).items():
+            #            if nickname.lower()==nick.lower():
+            #                jid=njid
+            #                break
 
             if not jid:
                 logging.warn("Unable to mute user. Couldn't resolve a JID")
@@ -355,6 +383,7 @@ class Moderation(slixmpp.ClientXMPP):
             mute = Mute(player=slixmpp.jid.JID(jid).bare, moderator=kwargs['moderator'],
                         start=datetime.now(), end=end,incident_id=incident_id)
             db.add(mute)
+            db.commit()
                 
             if type(end) is datetime: self.scheduler.schedule(self._scheduled_mute_ends(mute.player, mute.id), mute.end)
 
@@ -385,7 +414,7 @@ class Moderation(slixmpp.ClientXMPP):
             if not jid:
                 for room in self.rooms:
                     for nickname,njid in self._get_roster_jids(room).items():
-                        if nickname==nick:
+                        if nickname.lower()==nick.lower():
                             jid=njid
                             break
 
@@ -447,7 +476,7 @@ class Moderation(slixmpp.ClientXMPP):
             if not jid:
                 for room in self.rooms:
                     for nickname,njid in self._get_roster_jids(room).items():
-                        if nickname==nick:
+                        if nickname.lower()==nick.lower():
                             jid=njid
                             break
 

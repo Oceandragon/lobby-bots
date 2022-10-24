@@ -129,6 +129,10 @@ class ChatMonitor(slixmpp.ClientXMPP):
             room = msg['muc']['room']
             jid = self._get_jid(nick.lower(), room=room)
 
+            if not jid:
+                logging.info("Failed to find jid for nick %s", nick)
+                return
+
             if nick == self.nick:
                 return
             lowercase_message = msg['body'].lower()
@@ -155,7 +159,7 @@ class ChatMonitor(slixmpp.ClientXMPP):
                     logging.info("Player has more than 2 incidents. Muting player.")
 
                     # Mute duration starts at 15 minutes and doubles with each additional mute.
-                    duration = timedelta(minutes=15 * 2 ** max(0, db.query(ProfanityIncident).filter(ProfanityIncident.player==jid.bare, operators.isnot(ProfanityIncident.deleted,True)).count()-3))
+                    duration = timedelta(minutes=15 * 2 ** max(0, number_of_incidents))
                     logging.info("Mute duration: " + str(duration))
 
                     iq = self.make_iq_set(ito="user1@lobby.wildfiregames.com/moderation")
@@ -189,9 +193,10 @@ class ChatMonitor(slixmpp.ClientXMPP):
             room (slixmpp.jid.JID): (optional) MUC room
             
         """ 
+        nick = nick.lower()
         rooms = [ room ] if room else self.rooms
         for room in rooms:
-            roster = self.plugin['xep_0045'].get_roster(room)
+            roster = [nick_.lower() for nick_ in self.plugin['xep_0045'].get_roster(room)]
             if nick in roster: return slixmpp.jid.JID(self.plugin['xep_0045'].get_jid_property(room, nick, "jid"))
         return False
         

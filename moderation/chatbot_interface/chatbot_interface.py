@@ -60,6 +60,16 @@ class CommandProcessor():
         self.subparsers['help'] = subparser.add_parser('help', description='Get help', add_help=False)
         self.subparsers['help'].add_argument('helpcmd', action='store', help='Get help on a specific command', nargs='?', metavar='help-command', )
 
+        # Kick
+        self.subparsers['kick'] = subparser.add_parser('kick', description='Kick a player', add_help=False, formatter_class=CondensingFormatter)
+        match_by = self.subparsers['kick'].add_mutually_exclusive_group()
+        match_by.add_argument('--nick', dest="match_by", action='store_const', const='nick', help='Match by nick', )
+        match_by.add_argument('--regex', dest="match_by", action='store_const', const='regex', help='Match by regex (not implemented yet)', )
+        match_by.add_argument('-j', '--jid', dest="match_by", action='store_const', const='jid', help='Match by JID', )
+        match_by.set_defaults(match_by='nick')
+        self.subparsers['kick'].add_argument('user', action='store', help='User to kick', )
+        self.subparsers['kick'].add_argument('reason', action=join_with_spaces, help='Add a reason', default = [""], nargs='*', )
+
         # Ban (TODO)
         #self.subparsers['ban'] = subparser.add_parser('ban', description='Add a player to the ban list (not implemented yet)', add_help=False)
         #self.subparsers['ban'].add_argument('jid', action='store', help='Specify jid', )
@@ -80,7 +90,7 @@ class CommandProcessor():
         match_by.set_defaults(match_by='nick')
         self.subparsers['mute'].add_argument('user', action='store', help='User to mute', )
         self.subparsers['mute'].add_argument('duration', action=join_with_spaces, help='For a timed mute, specify duration', default='15 minutes'.split(" "), nargs='*', )
-        self.subparsers['mute'].add_argument('-r', '--reason', action=join_with_spaces, help='Add a reason', nargs='+', )
+        self.subparsers['mute'].add_argument('-r', '--reason', action=join_with_spaces, help='Add a reason', default=[""], nargs='*', )
 
         # Unmute
         self.subparsers['unmute'] = subparser.add_parser('unmute', description='Remove a player from the mute list', add_help=False)
@@ -97,8 +107,8 @@ class CommandProcessor():
             return "\n".join(self.parser.response)
         try: parsed = self.parser.parse_args(text)
         except (argparse.ArgumentError) as e: 
-            print(e.message)
-            print("yup", get_response())
+            logging.debug("e.message: %s", e.message)
+            logging.info(get_response())
             return get_response()
         parsed = vars(parsed)
         command = parsed['command']
@@ -119,7 +129,7 @@ class BotCommandProcessor(CommandProcessor):
         super().__init__()
 
     async def command_help(self, moderator, **kargs):
-        logging.debug("command_help: %s", pformat(kargs))
+        logging.info("command_help: %s", pformat(kargs))
         response=[]
         if kargs['helpcmd']:
             if kargs['helpcmd'] in self.subparsers: response.append(self.subparsers[kargs['helpcmd']].format_help())
@@ -130,18 +140,38 @@ class BotCommandProcessor(CommandProcessor):
             response.append(self.parser.format_help())
         return "\n".join(response)
 
+    async def command_kick(self, moderator, reason="", **kargs):
+        logging.info("command_kick: %s", pformat(kargs))
+        results = []
+        to = slixmpp.jid.JID(self.xmpp.sjid.bare)
+        to.resource = "moderation"
+        iq = self.xmpp.make_iq_set(ito=slixmpp.jid.JID(self.xmpp.sjid.bare+"/moderation"))
+        iq.enable('moderation')
+        iq['moderation']['moderation_command']['command_name'] = "kick"
+        params = {}
+        params[kargs['match_by']] = kargs['user']
+        params['reason']=reason
+        params['moderator']=moderator
+        iq['moderation']['moderation_command']['params'] = {param:str(value) for param,value in params.items()}
+        response = await iq.send()
+        logging.info(response['moderation']['moderation_command']['results'])
+        command_results = response['moderation']['moderation_command']['results']
+        if any(result for result in command_results if "success" in result and result['success']=="True"): results.append("Success")
+        else: results.append("Failed")
+        return "\n".join(results)
+
     async def command_ban(self, moderator, jid, **kargs):
-        logging.debug("command_ban: %s", pformat(kargs))
+        logging.info("command_ban: %s", pformat(kargs))
         response=[]
         return "\n".join(response)
 
     async def command_unban(self, moderator, **kargs):
-        logging.debug("command_unban: %s", pformat(kargs))
+        logging.info("command_unban: %s", pformat(kargs))
         response=[]
         return "\n".join(response)
 
     async def command_mutelist(self, moderator, **kargs):
-        logging.debug("command_mutelist: %s", pformat(kargs))
+        logging.info("command_mutelist: %s", pformat(kargs))
         results = []
         to = slixmpp.jid.JID(self.xmpp.sjid.bare)
         to.resource = "moderation"
@@ -157,7 +187,7 @@ class BotCommandProcessor(CommandProcessor):
         else: return "Users currently muted: %s" % ", ".join(muted)
 
     async def command_mute(self, moderator, reason="", **kargs):
-        logging.debug("command_mute: %s", pformat(kargs))
+        logging.info("command_mute: %s", pformat(kargs))
         results = []
         to = slixmpp.jid.JID(self.xmpp.sjid.bare)
         to.resource = "moderation"
@@ -171,14 +201,14 @@ class BotCommandProcessor(CommandProcessor):
         params['moderator']=moderator
         iq['moderation']['moderation_command']['params'] = {param:str(value) for param,value in params.items()}
         response = await iq.send()
-        print(response['moderation']['moderation_command']['results'])
+        logging.info(response['moderation']['moderation_command']['results'])
         command_results = response['moderation']['moderation_command']['results']
         if any(result for result in command_results if "success" in result and result['success']=="True"): results.append("Success")
         else: results.append("Failed")
         return "\n".join(results)
         
     async def command_unmute(self, moderator, reason="", **kargs):
-        logging.debug("command_unmute: %s", pformat(kargs))
+        logging.info("command_unmute: %s", pformat(kargs))
         results = []
         to = slixmpp.jid.JID(self.xmpp.sjid.bare)
         to.resource = "moderation"
@@ -192,7 +222,7 @@ class BotCommandProcessor(CommandProcessor):
         iq['moderation']['moderation_command']['params'] = {param:str(value) for param,value in params.items()}
         await iq.send()
         response = await iq.send()
-        print(response['moderation']['moderation_command']['results'])
+        logging.info(response['moderation']['moderation_command']['results'])
         command_results = response['moderation']['moderation_command']['results']
         if any(result for result in command_results if "success" in result and result['success']=="True"): results.append("Success")
         else: results.append("Failed")
@@ -209,6 +239,7 @@ class ChatbotInterface(slixmpp.ClientXMPP):
         self.sjid = slixmpp.jid.JID(sjid)
         self.command_room = slixmpp.jid.JID(command_room + '@conference.' + domain)
         self.command_password = command_password
+        self.domain = domain
         self.nick = nick
         self.background_tasks=[]
 
@@ -216,7 +247,7 @@ class ChatbotInterface(slixmpp.ClientXMPP):
         register_stanza_plugin(ModerationXmppPlugin, ModerationCommand)
 
         self.add_event_handler('session_start', self._got_session_start)
-        self.add_event_handler('groupchat_message', self._got_muc_message)
+        self.add_event_handler('message', self._got_muc_message)
 
         self.bcp = BotCommandProcessor(self)
         
@@ -238,25 +269,39 @@ class ChatbotInterface(slixmpp.ClientXMPP):
             msg (slixmpp.stanza.message.Message): Received MUC
                 message
         """
-        logging.info("Got groupchat message")
+        logging.info("Got message")
         if 'stamp' in msg['delay'].xml.attrib: return   # Don't process this message if it is a historical message.
+
+        moderator=None
+        if msg['type']=="chat":
+            pprint((self.command_room, msg['from']))
+            if self.command_room == msg['from'].bare:
+                pprint(msg["from"])
+                moderator = self._get_jid(msg['from'].resource).bare.lower()
+                print(moderator)
+                if not moderator: return
 
         lower_msg=msg['body'].lower()
         if lower_msg[0]=='!':
-            task = asyncio.create_task(self.bcp.process_commands(self._get_jid(msg['muc']['nick']).bare, lower_msg[1:].split()))
+            moderator = moderator if moderator else self._get_jid(msg['muc']['nick'].lower()).bare.lower()
+            task = asyncio.create_task(self.bcp.process_commands(moderator, lower_msg[1:].split()))
             def send_reply(something):
                 self.send_message(mto=msg['from'], mtype='chat',
-                              mbody=something.result())
+                                  mbody=something.result())
             task.add_done_callback(send_reply)
                               
     def _get_jid(self, nick):
-        """Return JID for a nick
+        """Return JID for a nick. This is not case sensitive.
             
         Arguments:
             nick (slixmpp.jid.JID): Retrieve JID for this nick            
         """ 
-        roster=self.plugin['xep_0045'].get_roster(self.command_room)
-        if nick in roster: return slixmpp.jid.JID(self.plugin['xep_0045'].get_jid_property(self.command_room, nick, "jid"))
+        
+        roster = self.plugin['xep_0045'].get_roster(self.command_room)
+        map_lower_nicks = { nick.lower(): nick for nick in roster }
+        roster_lowercase = [nick.lower() for nick in roster]
+
+        if nick.lower() in roster_lowercase: return slixmpp.jid.JID(self.plugin['xep_0045'].get_jid_property(self.command_room, map_lower_nicks[nick.lower()], "jid"))
         return False
         
 

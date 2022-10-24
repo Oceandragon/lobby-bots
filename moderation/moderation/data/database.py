@@ -21,8 +21,8 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
 engine = create_engine('mysql+pymysql://path/to/database',
-                       convert_unicode=True, future=True, 
-                       connect_args={'connect_timeout': 1000})
+                       convert_unicode=True, future=True, pool_recycle=3600,
+                       connect_args={'connect_timeout': 10})
                        
 db_session = scoped_session(sessionmaker(autocommit=False,
                                          autoflush=False,
@@ -38,7 +38,7 @@ def row2dict(row):
     """
     d = {}
     for column in row.__table__.columns:
-        d[column.name] = str(getattr(row, column.name))
+        d[column.name] = getattr(row, column.name)
     return d
 
 
