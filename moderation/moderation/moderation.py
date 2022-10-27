@@ -68,6 +68,7 @@ class Moderation(slixmpp.ClientXMPP):
 
         self.sjid = slixmpp.jid.JID(sjid)
         self.rooms = [slixmpp.jid.JID(room + '@conference.' + domain) for room in rooms]
+        self.domain = domain
         self.nick = nick
 
         self.scheduler = TimedScheduler(prefer_utc=False)
@@ -410,6 +411,11 @@ class Moderation(slixmpp.ClientXMPP):
                 logging.info("%s is not a moderator.", kwargs['moderator'])
                 return False
 
+            # Check if we can easily get the JID from our local mute list
+            jid_quick_check = "%s@%s" % (nick.lower(), self.domain)
+            if not jid and jid_quick_check in self.muted:
+                jid = jid_quick_check
+
             # Find JID by nickname
             if not jid:
                 for room in self.rooms:
@@ -423,9 +429,12 @@ class Moderation(slixmpp.ClientXMPP):
                 return False
             
             logging.info("Unmuting user with JID: %s", jid)
+            player=slixmpp.jid.JID(jid).bare
+
+            if player in self.muted: self.muted.remove(player)
 
             success=False
-            mutes = db.execute(select(Mute).filter_by(active=True, player=slixmpp.jid.JID(jid).bare, deleted=None)).scalars().all()
+            mutes = db.execute(select(Mute).filter_by(active=True, player=player, deleted=None)).scalars().all()
             for mute in mutes:
                 mute.active=False
                 mute.end=datetime.now()
@@ -499,6 +508,7 @@ class Moderation(slixmpp.ClientXMPP):
                     mute.active=False
                     db.commit()
             if user in self.muted: self.muted.remove(user)
+            logging.info(f"{user}, {slixmpp.jid.JID(user).user}")
             asyncio.ensure_future(self._muc_unmute(slixmpp.jid.JID(user).user))
         except: logging.exception(format_exc())
 
