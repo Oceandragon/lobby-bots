@@ -32,7 +32,7 @@ import sys
 
 from datetime import datetime, timedelta
 from functools import partial
-from gettext import gettext
+from gettext import gettext as _ 
 from moderation.stanzas import ModerationXmppPlugin, ModerationCommand
 from pprint import pprint, pformat
 from ptpython.repl import embed
@@ -93,7 +93,7 @@ class CommandProcessor():
         self.subparsers['mute'].add_argument('-r', '--reason', action=join_with_spaces, help='Add a reason', default=[""], nargs='*', )
 
         # Unmute
-        self.subparsers['unmute'] = subparser.add_parser('unmute', description='Remove a player from the mute list', add_help=False)
+        self.subparsers['unmute'] = subparser.add_parser('unmute', description='Remove a player from the mute list', add_help=False, formatter_class=CondensingFormatter)
         match_by = self.subparsers['unmute'].add_mutually_exclusive_group()
         match_by.add_argument('--nick', dest="match_by", action='store_const', const='nick', help='Match by nick', )
         match_by.add_argument('--regex', dest="match_by", action='store_const', const='regex', help='Match by regex (not implemented yet)', )
@@ -247,7 +247,7 @@ class ChatbotInterface(slixmpp.ClientXMPP):
         register_stanza_plugin(ModerationXmppPlugin, ModerationCommand)
 
         self.add_event_handler('session_start', self._got_session_start)
-        self.add_event_handler('message', self._got_muc_message)
+        self.add_event_handler('message', self._got_message)
 
         self.bcp = BotCommandProcessor(self)
         
@@ -262,8 +262,8 @@ class ChatbotInterface(slixmpp.ClientXMPP):
         self.get_roster()
         logging.info("Chatbot interface started")
 
-    def _got_muc_message(self, msg):
-        """Process messages in the MUC room.
+    def _got_message(self, msg):
+        """Process messages.
 
         Arguments:
             msg (slixmpp.stanza.message.Message): Received MUC
@@ -308,6 +308,39 @@ class ChatbotInterface(slixmpp.ClientXMPP):
 class CondensingFormatter(argparse.HelpFormatter):
     """ Change formatting of usage message for nargs=* and nargs=+ arguments
     """
+    def _format_usage(self, usage, actions, groups, prefix):
+        if prefix is None:
+            prefix = _('usage: ')
+
+        # if usage is specified, use that
+        if usage is not None:
+            usage = usage % dict(prog=self._prog)
+
+        # if no optionals or positionals are available, usage is just prog
+        elif usage is None and not actions:
+            usage = '%(prog)s' % dict(prog=self._prog)
+
+        # if optionals and positionals are available, calculate usage
+        elif usage is None:
+            prog = '%(prog)s' % dict(prog=self._prog)
+
+            # split optionals from positionals
+            optionals = []
+            positionals = []
+            for action in actions:
+                if action.option_strings:
+                    optionals.append(action)
+                else:
+                    positionals.append(action)
+
+            # build full usage string
+            format = self._format_actions_usage
+            action_usage = format(positionals + optionals, groups)
+            usage = ' '.join([s for s in [prog, action_usage] if s])
+
+        # prefix with 'usage:'
+        return '%s%s\n\n' % (prefix, usage)
+        
     def _format_args(self, action, default_metavar):
         get_metavar = self._metavar_formatter(action, default_metavar)
         if action.nargs in [argparse.ONE_OR_MORE, argparse.ZERO_OR_MORE]:
@@ -336,7 +369,7 @@ class ChatbotArgumentParser(argparse.ArgumentParser):
         self.print_help()
         logging.exception(format_exc())
         args = {'prog': self.prog, 'message': message}
-        self.exit(2, gettext('%(prog)s: error: %(message)s\n') % args)
+        self.exit(2, _('%(prog)s: error: %(message)s\n') % args)
 
     def exit(self, status=0, message=None):
         if message:
