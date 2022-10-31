@@ -117,7 +117,9 @@ class Moderation(slixmpp.ClientXMPP):
 
         """
 
+        #Join the MUC rooms
         for room in self.rooms: await self.plugin['xep_0045'].join_muc_wait(room, self.nick)
+
         self.send_presence()
         self.get_roster()
 
@@ -137,7 +139,7 @@ class Moderation(slixmpp.ClientXMPP):
             self.connect((self.xserver, 5222) if self.xserver else None, False, not self.xdisabletls)
         
     def _got_muc_presence(self, presence):
-        """Called for every MUC presence event
+        """Called for every MUC presence event.
         (Currently Unused)
 
         Arguments:
@@ -149,7 +151,7 @@ class Moderation(slixmpp.ClientXMPP):
         jid = slixmpp.jid.JID(presence['muc']['jid'])
 
     def _got_muc_online(self, presence):
-        """Called when the first resource for a user has connected to a MUC
+        """Called when the first resource for a user has connected to a MUC.
 
         Arguments:
             presence (slixmpp.stanza.presence.Presence): Received
@@ -165,7 +167,7 @@ class Moderation(slixmpp.ClientXMPP):
         logging.debug("Client '%s' connected with a nick of '%s'.", jid, nick)
 
     def _got_muc_offline(self, presence):
-        """Called when all resources of a user have disconnected from a muc
+        """Called when all resources of a user have disconnected from a MUC.
         (Currently Unused)
 
         Arguments:
@@ -189,7 +191,7 @@ class Moderation(slixmpp.ClientXMPP):
             ...
 
     async def _muc_mute(self, nick, room=None, reason=''):
-        """Perform mute on a nick in a MUC room or all rooms
+        """Perform mute on a nick in a MUC room or all rooms.
         """
         nick = self._get_nick_case(nick, room=room)
         logging.info("Muting MUC nick: %s", nick)
@@ -199,7 +201,7 @@ class Moderation(slixmpp.ClientXMPP):
             except: ... # Nick is not in the MUC room
 
     async def _muc_unmute(self, nick, room=None, reason=''):
-        """Unmute nick in a MUC room or all MUC rooms
+        """Unmute nick in a MUC room or all MUC rooms.
         """
         nick = self._get_nick_case(nick, room=room)
         logging.info("Unmuting MUC nick: %s", nick)
@@ -209,16 +211,13 @@ class Moderation(slixmpp.ClientXMPP):
             except: ... # Nick is not in the MUC room
 
     async def _muc_kick(self, nick, room=None, reason=''):
-        """Perform kick on a nick in a MUC room or all rooms
+        """Perform kick on a nick in a MUC room or all rooms.
 
             Arguments:
                 nick (str) :     Nickname of user to kick.
                 room (str) :     (Optional) Specify MUC room.
                 reason (str) :   (Optional) Specify reason to display publicly.
         """ 
-        print(nick)
-        #if room: nick = self._get_nick_case(nick, room=room)
-        #else: nick = self._get_nick_case(nick)
         nick = self._get_nick_case(nick, room=room)
         logging.info("Kicking MUC nick: %s", nick)
         rooms = [ room ] if room else self.rooms
@@ -228,13 +227,13 @@ class Moderation(slixmpp.ClientXMPP):
                 logging.debug("Nick is not in the MUC room")
 
     async def _muc_ban(self, jid, room=None, reason=''):
-        """Perform ban on a JID in a MUC room or all rooms
+        """Perform ban on a JID in a MUC room or all rooms.
             UNIMPLEMENTED
         """
         raise NotImplemented
 
     async def _muc_unban(self, jid, room=None, reason=''):
-        """Unban a JID in a MUC room or all rooms
+        """Unban a JID in a MUC room or all rooms.
             UNIMPLEMENTED
         """
         raise NotImplemented
@@ -321,14 +320,13 @@ class Moderation(slixmpp.ClientXMPP):
         for room in rooms:
             roster = self.plugin['xep_0045'].get_roster(room)
             map_lower_nicks = { nick.lower(): nick for nick in roster }
-            roster_lowercase = [nick.lower() for nick in roster]
 
-            if nick.lower() in roster_lowercase: return slixmpp.jid.JID(self.plugin['xep_0045'].get_jid_property(room, map_lower_nicks[nick.lower()], "jid"))
+            if nick.lower() in map_lower_nicks: return slixmpp.jid.JID(self.plugin['xep_0045'].get_jid_property(room, map_lower_nicks[nick.lower()], "jid"))
         return False
                 
     def _get_roster_jids(self, room):
-        """Return roster for the MUC room as a dict of jids keyed by
-        nickname
+        """Return roster for the MUC room as a dict of JIDs keyed by
+        nickname.
         
         Arguments:
             room (slixmpp.jid.JID): MUC room
@@ -356,6 +354,7 @@ class Moderation(slixmpp.ClientXMPP):
             try: return map_lower_nicks[nick]
             except KeyError: ... # Nick not found in room
         return False
+        
     def command_mute(self, jid=None, nick=None, duration=None, incident_id=None, reason='', end=None, **kwargs):
         """Add a mute to the database and mute the user in the MUC rooms.
         Specify either jid or nick.
@@ -457,7 +456,6 @@ class Moderation(slixmpp.ClientXMPP):
                 mute.active=False
                 mute.end=datetime.now()
                 success=True
-            
             asyncio.ensure_future(self._muc_unmute(nick or slixmpp.jid.JID(jid).user, reason=reason))
             return success
 
@@ -526,7 +524,6 @@ class Moderation(slixmpp.ClientXMPP):
                     mute.active=False
                     db.commit()
             if user in self.muted: self.muted.remove(user)
-            logging.info(f"{user}, {slixmpp.jid.JID(user).user}")
             asyncio.ensure_future(self._muc_unmute(slixmpp.jid.JID(user).user))
         except: logging.exception(format_exc())
 

@@ -103,12 +103,14 @@ class CommandProcessor():
         self.subparsers['unmute'].add_argument('-r', '--reason', action=join_with_spaces, help='Add a reason', nargs='+',)
 
     async def process_commands(self, moderator, text):
+        """Use parser to get command and arguments. Run the command method retrieved from the parsed results.
+        """
         def get_response():
             return "\n".join(self.parser.response)
         try: parsed = self.parser.parse_args(text)
         except (argparse.ArgumentError) as e: 
             logging.debug("e.message: %s", e.message)
-            logging.info(get_response())
+            logging.debug(get_response())
             return get_response()
         parsed = vars(parsed)
         command = parsed['command']
@@ -154,7 +156,6 @@ class BotCommandProcessor(CommandProcessor):
         params['moderator']=moderator
         iq['moderation']['moderation_command']['params'] = {param:str(value) for param,value in params.items()}
         response = await iq.send()
-        logging.info(response['moderation']['moderation_command']['results'])
         command_results = response['moderation']['moderation_command']['results']
         if any(result for result in command_results if "success" in result and result['success']=="True"): results.append("Success")
         else: results.append("Failed")
@@ -201,7 +202,6 @@ class BotCommandProcessor(CommandProcessor):
         params['moderator']=moderator
         iq['moderation']['moderation_command']['params'] = {param:str(value) for param,value in params.items()}
         response = await iq.send()
-        logging.info(response['moderation']['moderation_command']['results'])
         command_results = response['moderation']['moderation_command']['results']
         if any(result for result in command_results if "success" in result and result['success']=="True"): results.append("Success")
         else: results.append("Failed")
@@ -222,7 +222,6 @@ class BotCommandProcessor(CommandProcessor):
         iq['moderation']['moderation_command']['params'] = {param:str(value) for param,value in params.items()}
         await iq.send()
         response = await iq.send()
-        logging.info(response['moderation']['moderation_command']['results'])
         command_results = response['moderation']['moderation_command']['results']
         if any(result for result in command_results if "success" in result and result['success']=="True"): results.append("Success")
         else: results.append("Failed")
@@ -338,7 +337,7 @@ class CondensingFormatter(argparse.HelpFormatter):
             action_usage = format(positionals + optionals, groups)
             usage = ' '.join([s for s in [prog, action_usage] if s])
 
-        # prefix with 'usage:'
+        # prefix with usage
         return '%s%s\n\n' % (prefix, usage)
         
     def _format_args(self, action, default_metavar):

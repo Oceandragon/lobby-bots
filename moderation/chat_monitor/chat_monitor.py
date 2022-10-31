@@ -170,7 +170,7 @@ class ChatMonitor(slixmpp.ClientXMPP):
                                                                         "moderator": "userbot@lobby.wildfiregames.com"}
                     try:
                         iq.send()
-                    except: logging.exception(traceback.format_exc())
+                    except: logging.exception(format_exc())
                     
                 else: 
                     logging.info("Kicking player from the room with a warning.")
