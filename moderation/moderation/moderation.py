@@ -60,13 +60,15 @@ class Moderation(slixmpp.ClientXMPP):
     """An XMPP client that handles IQs and performs/processes commands.
     """
 
-    def __init__(self, sjid, password, rooms, nick, domain):
+    def __init__(self, sjid, password, rooms, nick, domain, xserver, xdisabletls):
         """Initialize and register handlers."""
 
         slixmpp.ClientXMPP.__init__(self, slixmpp.jid.JID(sjid), password)
         self.whitespace_keepalive = False
 
         self.sjid = slixmpp.jid.JID(sjid)
+        self.xserver = xserver
+        self.xdisabletls = xdisabletls
         self.rooms = [slixmpp.jid.JID(room + '@conference.' + domain) for room in rooms]
         self.domain = domain
         self.nick = nick
@@ -84,6 +86,7 @@ class Moderation(slixmpp.ClientXMPP):
         for room in self.rooms:
             self.add_event_handler('muc::%s::got_online' % room, self._got_muc_online)
         self.add_event_handler('groupchat_message', self._got_muc_message)
+        self.add_event_handler('disconnected', self._got_disconnect)
 
         # Initialize mutes and bans
         self.muted = set()
@@ -101,6 +104,8 @@ class Moderation(slixmpp.ClientXMPP):
             
         self.banned = set()     #TODO: UNIMPLEMENTED
         
+        self.shutdown = False
+        
     async def start_scheduler(self):
         self.scheduler.start()
 
@@ -117,6 +122,19 @@ class Moderation(slixmpp.ClientXMPP):
         self.get_roster()
 
         logging.info("Moderation started")
+        
+    async def _got_disconnect(self, event):  # pylint: disable=unused-argument
+        """Reconnect if we're not shutting down.
+
+        Arguments:
+            event (dict): empty dummy dict
+
+        """
+
+        logging.info("Got disconnect.")
+        if not self.shutdown:
+            logging.info("Reconnecting.")
+            self.connect((self.xserver, 5222) if self.xserver else None, False, not self.xdisabletls)
         
     def _got_muc_presence(self, presence):
         """Called for every MUC presence event
@@ -289,7 +307,7 @@ class Moderation(slixmpp.ClientXMPP):
                                   (command, iq['from'].bare))
             try: reply.send()
             except:
-                logging.exception("aw fevbdrasgabega" + format_exc())
+                logging.exception(format_exc())
                 return False
 
     def _get_jid(self, nick, room=None):
@@ -567,7 +585,7 @@ async def async_main():
                         datefmt='%Y-%m-%d %H:%M:%S')
 
     xmpp = Moderation('%s@%s/%s' % (args.login, args.domain, 'moderation'), args.password,
-                   args.rooms, args.nickname, args.domain)
+                   args.rooms, args.nickname, args.domain, args.xserver, args.xdisabletls)
     xmpp.register_plugin('xep_0030')  # Service Discovery
     xmpp.register_plugin('xep_0004')  # Data Forms
     xmpp.register_plugin('xep_0045')  # Multi-User Chat
@@ -581,7 +599,8 @@ async def async_main():
     try: await console
     except: logging.exception(format_exc())
 
-    await xmpp.disconnect()
+    xmpp.shutdown = True
+    await xmpp.disconnect(ignore_send_queue=True)
 
 def main():
     asyncio.run(async_main())
