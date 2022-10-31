@@ -194,6 +194,7 @@ class Moderation(slixmpp.ClientXMPP):
         """Perform mute on a nick in a MUC room or all rooms.
         """
         nick = self._get_nick_case(nick, room=room)
+        if not nick: return
         logging.info("Muting MUC nick: %s", nick)
         rooms = [ room ] if room else self.rooms
         for room in rooms:
@@ -204,6 +205,7 @@ class Moderation(slixmpp.ClientXMPP):
         """Unmute nick in a MUC room or all MUC rooms.
         """
         nick = self._get_nick_case(nick, room=room)
+        if not nick: return
         logging.info("Unmuting MUC nick: %s", nick)
         rooms = [ room ] if room else self.rooms
         for room in rooms:
@@ -219,6 +221,7 @@ class Moderation(slixmpp.ClientXMPP):
                 reason (str) :   (Optional) Specify reason to display publicly.
         """ 
         nick = self._get_nick_case(nick, room=room)
+        if not nick: return
         logging.info("Kicking MUC nick: %s", nick)
         rooms = [ room ] if room else self.rooms
         for room in rooms:
@@ -375,14 +378,8 @@ class Moderation(slixmpp.ClientXMPP):
                 logging.info("%s is not a moderator.", kwargs['moderator'])
                 return False
 
-            if not jid: jid = self._get_jid(nick)
-            # Find JID by nickname
-            #if not jid:
-            #    for room in self.rooms:
-            #        for nickname,njid in self._get_roster_jids(room).items():
-            #            if nickname.lower()==nick.lower():
-            #                jid=njid
-            #                break
+            if not jid and nick:
+                jid = self._get_jid(nick.lower())
 
             if not jid:
                 logging.warn("Unable to mute user. Couldn't resolve a JID")
@@ -429,17 +426,14 @@ class Moderation(slixmpp.ClientXMPP):
                 return False
 
             # Check if we can easily get the JID from our local mute list
-            jid_quick_check = "%s@%s" % (nick.lower(), self.domain)
-            if not jid and jid_quick_check in self.muted:
-                jid = jid_quick_check
+            if not jid and nick:
+                jid_quick_check = "%s@%s" % (nick.lower(), self.domain)
+                if jid_quick_check in self.muted:
+                    jid = jid_quick_check
 
-            # Find JID by nickname
-            if not jid:
-                for room in self.rooms:
-                    for nickname,njid in self._get_roster_jids(room).items():
-                        if nickname.lower()==nick.lower():
-                            jid=njid
-                            break
+            # Find JID by nickname in MUC rooms
+            if not jid and nick:
+                jid = self._get_jid(nick.lower())
 
             if not jid:
                 logging.warn("Unable to unmute user. Couldn't resolve a JID")

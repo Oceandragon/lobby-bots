@@ -220,7 +220,6 @@ class BotCommandProcessor(CommandProcessor):
         params['reason'] = reason
         params['moderator'] = moderator
         iq['moderation']['moderation_command']['params'] = {param:str(value) for param,value in params.items()}
-        await iq.send()
         response = await iq.send()
         command_results = response['moderation']['moderation_command']['results']
         if any(result for result in command_results if "success" in result and result['success']=="True"): results.append("Success")
